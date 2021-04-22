@@ -1,5 +1,4 @@
 from scholarly import scholarly
-# from project import db
 import sqlite3
 from sqlite3 import Error
 # from app import create_app
@@ -7,22 +6,36 @@ from sqlite3 import Error
 def get_topics(conn):
     f = open("topics.txt", "r")
 
-    # profile = Profile(name="pooh", scholar_id="123a", url_picture="fsfs.com")
     # profile = ("pooh", "123a", "fsfs.com")
-    # create_profile(conn, profile)
+    # idk = create_profile(conn, profile)
+    # print('idk is: ', idk)
 
-    # topic = Topics(name="peeh", author_id=2)
     # topic = ("peeh", "2")
     # create_topic(conn, topic)
 
     for topic in f:
+        temp_topic = topic
         new_topic = topic.lower().replace(' ', '_')
 
         search_query = scholarly.search_keyword(new_topic)
-        for i in range(1):
+        for i in range(50):
             print('---------------------------------------')
+            print(temp_topic)
             try:
-                scholarly.pprint(next(search_query))
+                # scholarly.pprint(next(search_query))
+                author = next(search_query)
+                # scholarly.pprint(scholarly.fill(author, sections=['basics', 'indices', 'coauthors']))
+                # print(author['name'])
+                # print(author['interests'])
+
+                profile = (author['name'], author['scholar_id'], author['url_picture'])
+                profile_id = create_profile(conn, profile)
+
+                # print(temp_topic)
+                if profile_id != None:
+                    db_topic = (temp_topic, str(profile_id))
+                    create_topic(conn, db_topic)
+
             except StopIteration:
                 print('NO KEYWORD FOR: ', topic)
 
@@ -60,7 +73,10 @@ def create_profile(conn, profile):
                 VALUES(?,?,?) '''
 
     cur = conn.cursor()
-    cur.execute(sql, profile)
+    try:
+        cur.execute(sql, profile)
+    except:
+        pass
     conn.commit()
     return cur.lastrowid
 
@@ -90,8 +106,6 @@ def create_topic(conn, topic):
     return cur.lastrowid
 
 if __name__ == '__main__':
-    print('bro')
-
     database = 'db.sqlite3'
 
     # # create a database connection
