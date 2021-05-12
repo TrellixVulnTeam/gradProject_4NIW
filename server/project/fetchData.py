@@ -1,17 +1,10 @@
-from scholarly import scholarly
+from scholarly import scholarly, ProxyGenerator
 import sqlite3
 from sqlite3 import Error
 # from app import create_app
 
 def get_topics(conn):
     f = open("topics.txt", "r")
-
-    # profile = ("pooh", "123a", "fsfs.com")
-    # idk = create_profile(conn, profile)
-    # print('idk is: ', idk)
-
-    # topic = ("peeh", "2")
-    # create_topic(conn, topic)
 
     for topic in f:
         temp_topic = topic
@@ -39,17 +32,129 @@ def get_topics(conn):
             except StopIteration:
                 print('NO KEYWORD FOR: ', topic)
 
-    # for topic in f:
-    #     print('topic is: ', topic)
+#THIS IS OBSOLETE I THINK
+def get_publications(conn):
+    f = open("topics.txt", "r")
 
-    #     search_query = scholarly.search_keyword(topic)
-    #     # search_query = scholarly.search_pubs(topic)
-    #     for i in range(1):
-    #         print('--------------------------HEEELLOOOOOOOOOOOOOOOOOOOOOOOOOOO--------------------------------------')
-    #         try:
-    #             scholarly.pprint(next(search_query))
-    #         except StopIteration:
-                # print('NO KEYWORD FOR: ', topic)
+    for topic in f:
+        temp_topic = topic
+        new_topic = topic.lower().replace(' ', '_')
+
+        search_query = scholarly.search_pubs(new_topic)
+        for i in range(1):
+            print('---------------------------------------')
+            print(temp_topic)
+            try:
+                publication = next(search_query)
+                # print(publication)
+                #TODO: is it correct to do [0]??? do we even need the author id
+                author_id = publication['author_id'][0]
+                title = publication['bib']['title']
+                abstract = publication['bib']['abstract']
+                num_citations = publication['num_citations']
+
+                # print(publication)
+                # print(author_id)
+                # scholarly.pprint(next(search_query))
+
+                # get author id and search in our db if they exist.
+                cur = conn.cursor()
+                cur.execute("SELECT id, name, scholar_id FROM Profile WHERE scholar_id=?", (author_id,))
+
+                rows = cur.fetchall()
+
+                if rows:
+                    prof_id = rows[0][0]
+                    # print(prof_id)
+
+                    #if they exist, create publication and pubs with the ids
+                    publication = (title, abstract, num_citations)
+                    pub_id = create_publication(conn, publication)
+
+                    if pub_id != None:
+                        pub = (prof_id, pub_id)
+                        sql = ''' INSERT INTO pubs(profile_id, publication_id)
+                                    VALUES(?,?) '''
+
+                        cur = conn.cursor()
+                        cur.execute(sql, pub)
+                        conn.commit()
+                else:
+                    #if they don't exist, create profile with its public and pubs
+                    #TODO: in case of more than one author
+                    profile = (publication['bib']['author'][0], author_id, "nonefornow")
+                    prof_id = create_profile(conn, profile)
+
+                    publication = (title, num_citations)
+                    pub_id = create_publication(conn, publication)
+
+                    if prof_id != None and pub_id != None:
+                        pub = (prof_id, pub_id)
+
+                        sql = ''' INSERT INTO pubs(profile_id, publication_id)
+                                    VALUES(?,?) '''
+
+                        cur = conn.cursor()
+                        cur.execute(sql, pub)
+                        conn.commit()
+
+
+
+            except StopIteration:
+                print('NO PUBLICATION FOR: ', topic)
+
+def get_authors():
+    cur = conn.cursor()
+    cur.execute("SELECT * from Profile")
+
+    rows = cur.fetchall()
+    rl = len(rows)
+    rl = rl//4
+
+    rows1 = rows[:rl]
+    rows2 = rows[rl:2*rl]
+    rows3 = rows[2*rl:3*rl]
+    rows4 = rows[3*rl:]
+
+    for row in rows1: 
+        print(row)
+        name_search = row[1]
+        search_query = scholarly.search_author(name_search)
+        author = scholarly.fill(next(search_query))
+        author_id = author['scholar_id']
+
+        count = 0
+        for pub in author['publications']:
+            print('--------------------')
+            print(pub)
+
+            print('FINDING ABSTRACT')
+            search_query2 = scholarly.search_pubs(pub['bib']['title'])
+            scholarly.pprint(next(search_query2))
+            # publication = next(search_query2)
+            # print(publication)
+
+            # #checking author id
+            # if author_id in publication['author_id']:
+            #     abstract = publication['bib']['abstract']
+            #     title = publication['bib']['title']
+            #     num_citations = publication['num_citations']
+
+            #     publication = (title, abstract, num_citations)
+            #     pub_id = create_publication(conn, publication)
+
+            #     if pub_id != None:
+            #         pub = (author_id, pub_id)
+
+            #         sql = ''' INSERT INTO pubs(profile_id, publication_id)
+            #                     VALUES(?,?) '''
+
+            #         cur = conn.cursor()
+            #         cur.execute(sql, pub)
+            #         conn.commit()
+
+            # if count == 5: break
+            # count += 1
 
 def create_connection(db_file):
     """ create a database connection to the SQLite database
@@ -80,19 +185,6 @@ def create_profile(conn, profile):
     conn.commit()
     return cur.lastrowid
 
-def create_user(conn, user):
-    """
-    create a new user to insert into the user table
-    """
-
-    sql = ''' INSERT INTO User(name,location,date_created)
-                VALUES(?,?,?) '''
-
-    cur = conn.cursor()
-    cur.execute(sql, user)
-    conn.commit()
-    return cur.lastrowid
-
 def create_topic(conn, topic):
     """
     create a new profile
@@ -105,12 +197,27 @@ def create_topic(conn, topic):
     conn.commit()
     return cur.lastrowid
 
+def create_publication(conn, publication):
+    """
+    create a new publication row
+    """
+    sql = ''' INSERT INTO Publications(title, abstract, num_citations)
+                VALUES(?,?,?) '''
+
+    cur = conn.cursor()
+    try:
+        cur.execute(sql, publication)
+    except:
+        pass
+    conn.commit()
+    return cur.lastrowid
+
 if __name__ == '__main__':
     database = 'db.sqlite3'
 
     # # create a database connection
     conn = create_connection(database)
     print(conn)
-    # print('db is: ', db)
 
-    get_topics(conn)
+    # get_topics(conn)
+    get_authors()
