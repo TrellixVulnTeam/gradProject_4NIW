@@ -3,6 +3,8 @@ import sqlite3
 from sqlite3 import Error
 # from app import create_app
 
+OLDEST_PUB_YEAR = 2011
+
 def get_topics(conn):
     f = open("topics.txt", "r")
 
@@ -112,25 +114,48 @@ def get_authors():
     rl = rl//4
 
     rows1 = rows[:rl]
+    print(len(rows1), 'will be how much we need!')
     rows2 = rows[rl:2*rl]
     rows3 = rows[2*rl:3*rl]
     rows4 = rows[3*rl:]
 
-    for row in rows1: 
+    for row in rows1:
         print(row)
         name_search = row[1]
         search_query = scholarly.search_author(name_search)
         author = scholarly.fill(next(search_query))
-        author_id = author['scholar_id']
 
-        count = 0
-        for pub in author['publications']:
-            print('--------------------')
-            print(pub)
+        author_info = scholarly.fill(author, sections=['publications'])
+        autor_info_publications = author_info['publications']
+        print('---')
+        print('authorname: ', row[1])
+        print('authorid: ', row[2])
+        # print(author_info)
+        for i in range(len(autor_info_publications)):
+            title = autor_info_publications[i]['bib']['title']
+            if 'pub_year' in autor_info_publications[i]['bib'].keys():
+                pub_year = autor_info_publications[i]['bib']['pub_year']
+                if int(pub_year) >= OLDEST_PUB_YEAR:
+                    print(title)
+                    print(pub_year)
 
-            print('FINDING ABSTRACT')
-            search_query2 = scholarly.search_pubs(pub['bib']['title'])
-            scholarly.pprint(next(search_query2))
+
+
+        # ASK if i should store all publications even the really old ones
+        # PROCESS:
+        # get the publications list. 
+        # store the titles and author in a file.
+        # search for search_pubs using the title
+        # create publication and then create pubs relation
+
+        # count = 0
+        # for pub in author['publications']:
+        #     print('--------------------')
+        #     print(pub)
+
+        #     print('FINDING ABSTRACT')
+        #     search_query2 = scholarly.search_pubs(pub['bib']['title'])
+        #     scholarly.pprint(next(search_query2))
             # publication = next(search_query2)
             # print(publication)
 
