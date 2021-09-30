@@ -1,0 +1,4 @@
+*.pyc
+server/env/*
+server/env/**
+env/lib/*
